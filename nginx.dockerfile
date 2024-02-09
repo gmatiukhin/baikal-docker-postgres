@@ -1,13 +1,21 @@
 # Multi-stage build, see https://docs.docker.com/develop/develop-images/multistage-build/
-FROM alpine AS builder
+FROM composer AS builder
 
 ENV VERSION 0.9.5
 
-ADD https://github.com/sabre-io/Baikal/releases/download/$VERSION/baikal-$VERSION.zip .
-RUN apk add unzip && unzip -q baikal-$VERSION.zip
+RUN apk add git rsync &&\
+  git clone https://github.com/leso-kn/Baikal.git &&\
+  cd Baikal &&\
+  git checkout feature/pgsql &&\
+  make
 
 # Final Docker image
 FROM nginx:1
+
+LABEL description="Baikal is a Cal and CardDAV server, based on sabre/dav, that includes an administrative interface for easy management."
+LABEL version="0.9.5"
+LABEL repository="https://github.com/ckulka/baikal-docker"
+LABEL website="http://sabre.io/baikal/"
 
 # Install dependencies: PHP (with libffi6 dependency) & SQLite3
 RUN curl -o /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg &&\
@@ -21,6 +29,7 @@ RUN curl -o /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
     php8.1-fpm                \
     php8.1-mbstring           \
     php8.1-mysql              \
+    php8.1-pgsql              \
     php8.1-sqlite3            \
     php8.1-xml                \
     sqlite3                   \
@@ -31,7 +40,7 @@ RUN curl -o /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
 
 # Add Baikal & nginx configuration
 COPY files/docker-entrypoint.d/*.sh files/docker-entrypoint.d/nginx/ /docker-entrypoint.d/
-COPY --from=builder --chown=nginx:nginx baikal /var/www/baikal
+COPY --from=builder --chown=nginx:nginx /app/Baikal/build/baikal /var/www/baikal
 COPY files/nginx.conf /etc/nginx/conf.d/default.conf
 
 VOLUME /var/www/baikal/config
