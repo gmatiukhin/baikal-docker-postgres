@@ -1,27 +1,31 @@
 # Multi-stage build, see https://docs.docker.com/develop/develop-images/multistage-build/
-FROM alpine AS builder
+FROM composer AS builder
 
-ENV VERSION 0.9.4
+ENV VERSION 0.9.3
 
-ADD https://github.com/sabre-io/Baikal/releases/download/$VERSION/baikal-$VERSION.zip .
-RUN apk add unzip && unzip -q baikal-$VERSION.zip
+RUN apk add git rsync &&\
+  git clone https://github.com/leso-kn/Baikal.git &&\
+  cd Baikal &&\
+  git checkout feature/pgsql &&\
+  make
 
 # Final Docker image
 FROM php:8.1-apache
 
 LABEL description="Baikal is a Cal and CardDAV server, based on sabre/dav, that includes an administrative interface for easy management."
-LABEL version="0.9.4"
+LABEL version="0.9.3"
 LABEL repository="https://github.com/ckulka/baikal-docker"
 LABEL website="http://sabre.io/baikal/"
 
 # Install Baikal and required dependencies
-COPY --from=builder --chown=www-data:www-data baikal /var/www/baikal
+COPY --from=builder --chown=www-data:www-data /app/Baikal/build/baikal /var/www/baikal
 RUN apt-get update            &&\
   apt-get install -y          \
     libcurl4-openssl-dev      \
-    msmtp msmtp-mta           &&\
+    msmtp msmtp-mta           \
+    libpq-dev                 &&\
   rm -rf /var/lib/apt/lists/* &&\
-  docker-php-ext-install curl pdo pdo_mysql
+  docker-php-ext-install curl pdo pdo_mysql pdo_pgsql
 
 # Configure Apache + HTTPS
 COPY files/apache.conf /etc/apache2/sites-enabled/000-default.conf
