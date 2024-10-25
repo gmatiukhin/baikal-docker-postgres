@@ -1,3 +1,5 @@
+.PHONY: build apache nginx
+
 build: apache nginx
 
 apache:
